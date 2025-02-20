@@ -27,3 +27,7 @@ cd SA-D
 
 # Cài đặt các dependencies
 pip install -r requirements.txt
+
+# Tạo file .env theo mẫu .env.example
+
+

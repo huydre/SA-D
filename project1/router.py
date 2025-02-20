@@ -4,7 +4,7 @@ class DatabaseRouter:
             return 'mongodb'
         elif model._meta.app_label == 'customer':
             return 'mysql'
-        elif model._meta.app_label == 'order':
+        elif model._meta.app_label == 'order' or model._meta.app_label == 'shipping':
             return 'postgresql'
         return 'default'
 
@@ -13,7 +13,7 @@ class DatabaseRouter:
             return 'mongodb'
         elif model._meta.app_label == 'customer':
             return 'mysql'
-        elif model._meta.app_label == 'order':
+        elif model._meta.app_label == 'order' or model._meta.app_label == 'shipping':
             return 'postgresql'
         return 'default'
 
@@ -26,5 +26,7 @@ class DatabaseRouter:
         elif app_label == 'customer':
             return db == 'mysql'
         elif app_label == 'order':
+            return db == 'postgresql'
+        elif app_label == 'shipping':
             return db == 'postgresql'
         return db == 'default'
