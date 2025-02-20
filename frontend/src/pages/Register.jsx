@@ -1,13 +1,19 @@
 import React from 'react'
+import { useDispatch } from 'react-redux';
+import { register } from '../features/auth/authSlice';
 
 function Register() {
     const [formData, setFormData] = React.useState({
-      fullName: '',
+      full_name: '',
       email: '',
       password: '',
-      confirmPassword: ''
+      confirmPassword: '',
+      address: '',
+      contact: '',
+      username: '',
     });
     const [errors, setErrors] = React.useState({});
+    const dispatch = useDispatch();
     const [loading, setLoading] = React.useState(false);
     const navigate = { push: () => console.log('Navigation would happen here') }; // Simulated for playground
   
@@ -62,6 +68,7 @@ function Register() {
         setLoading(true);
         try {
           // Simulated API call
+          await dispatch(register(formData)).unwrap();
           await new Promise(resolve => setTimeout(resolve, 1000));
           console.log('Registration successful', formData);
           navigate.push('/login');

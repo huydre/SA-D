@@ -6,12 +6,7 @@ from book.models import Book
 from customer.models import Customer
 
 class Cart(models.Model):
-    customer = models.ForeignKey(
-        Customer,
-        on_delete=models.CASCADE,
-        verbose_name="Customer",
-        related_name="carts"
-    )
+    customer_id = models.IntegerField("Customer ID")
     created_at = models.DateTimeField("Created At", auto_now_add=True)
     updated_at = models.DateTimeField("Updated At", auto_now=True)
     status = models.CharField(
@@ -80,17 +75,12 @@ class CartItem(models.Model):
         verbose_name="Cart",
         related_name="items"
     )
-    book = models.ForeignKey(
-        Book,
-        on_delete=models.CASCADE,
-        verbose_name="Book"
-    )
+    book_id = models.CharField(max_length=24)  # Thay vì ForeignKey đến Book
     quantity = models.PositiveIntegerField("Quantity", default=1)
     price_at_time = models.DecimalField(
         "Price at Time",
         max_digits=10,
-        decimal_places=2,
-        help_text="Price of the book when added to cart"
+        decimal_places=2
     )
     created_at = models.DateTimeField("Created At", auto_now_add=True)
     updated_at = models.DateTimeField("Updated At", auto_now=True)
@@ -98,7 +88,7 @@ class CartItem(models.Model):
     class Meta:
         verbose_name = "Cart Item"
         verbose_name_plural = "Cart Items"
-        unique_together = ('cart', 'book')
+        unique_together = ('cart', 'book_id')
         ordering = ['created_at']
 
     def __str__(self):
@@ -113,13 +103,18 @@ class CartItem(models.Model):
                 'quantity': f'Not enough stock. Available: {self.book.stock}'
             })
 
-    def save(self, *args, **kwargs):
-        """Override save to set price_at_time if not set"""
-        if not self.price_at_time:
-            self.price_at_time = self.book.price
-        super().save(*args, **kwargs)
-
     @property
     def subtotal(self):
         """Tính tổng giá trị của item"""
         return Decimal(str(self.quantity)) * self.price_at_time
+
+    def save(self, *args, **kwargs):
+        # Chuyển đổi price_at_time thành Decimal nếu cần
+        if isinstance(self.price_at_time, float):
+            self.price_at_time = Decimal(str(self.price_at_time))
+
+        # Tính và lưu subtotal
+        self._subtotal = self.subtotal
+        super().save(*args, **kwargs)
+
+    

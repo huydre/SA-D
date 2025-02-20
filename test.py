@@ -1,25 +1,13 @@
-# management/commands/check_db.py
-from django.core.management.base import BaseCommand
-from django.db import connections
-from django.db.utils import OperationalError
+from bson import ObjectId
+
+# Trong Django shell
 from book.models import Book
+# Liệt kê tất cả books
+books = Book.objects.using('mongodb').all()
+for book in books:
+    print(f"ID: {book._id}, Title: {book.title}")
 
-class Command(BaseCommand):
-    def handle(self, *args, **options):
-        try:
-            # Kiểm tra MongoDB
-            books = Book.objects.using('mongodb').all()
-            self.stdout.write(f'MongoDB connection successful. Found {books.count()} books')
-
-            # Kiểm tra MySQL
-            cursor = connections['customers'].cursor()
-            self.stdout.write('MySQL connection successful')
-
-            # Kiểm tra SQLite
-            cursor = connections['default'].cursor()
-            self.stdout.write('SQLite connection successful')
-
-        except OperationalError as e:
-            self.stderr.write(f'Database error: {e}')
-        except Exception as e:
-            self.stderr.write(f'Error: {e}')
+# Hoặc tìm một book cụ thể
+book_id = ObjectId("65f2c1234567890123456789")  # Thay bằng ID thực
+book = Book.objects.using('mongodb').get(_id=book_id)
+print(f"Found book: {book.title}")

@@ -1,34 +1,27 @@
 class DatabaseRouter:
+    # Dictionary mapping apps to their databases
+    APP_DB_MAPPING = {
+        'book': 'mongodb',
+        'customer': 'mysql',
+        'order': 'postgresql',
+        'shipping': 'postgresql',
+        'paying': 'postgresql',
+        'cart': 'postgresql',
+        'cartitem': 'postgresql',
+    }
+
+    def _get_db(self, app_label):
+        return self.APP_DB_MAPPING.get(app_label, 'default')
+
     def db_for_read(self, model, **hints):
-        if model._meta.app_label == 'book':
-            return 'mongodb'
-        elif model._meta.app_label == 'customer':
-            return 'mysql'
-        elif model._meta.app_label == 'order' or model._meta.app_label == 'shipping' or model._meta.app_label == 'paying':
-            return 'postgresql'
-        return 'default'
+        return self._get_db(model._meta.app_label)
 
     def db_for_write(self, model, **hints):
-        if model._meta.app_label == 'book':
-            return 'mongodb'
-        elif model._meta.app_label == 'customer':
-            return 'mysql'
-        elif model._meta.app_label == 'order' or model._meta.app_label == 'shipping' or model._meta.app_label == 'paying':
-            return 'postgresql'
-        return 'default'
+        return self._get_db(model._meta.app_label)
 
     def allow_relation(self, obj1, obj2, **hints):
         return True
 
     def allow_migrate(self, db, app_label, model_name=None, **hints):
-        if app_label == 'book':
-            return db == 'mongodb'
-        elif app_label == 'customer':
-            return db == 'mysql'
-        elif app_label == 'order':
-            return db == 'postgresql'
-        elif app_label == 'shipping':
-            return db == 'postgresql'
-        elif app_label == 'paying':
-            return db == 'postgresql'
-        return db == 'default'
+        target_db = self._get_db(app_label)
+        return db == target_db

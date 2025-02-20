@@ -1,5 +1,8 @@
 # Bookstore Project
 
+Kiến trúc và thiết kế phần mềm - PTIT
+Thầy Trần Đình Quế
+
 Dự án website bán sách sử dụng Django REST Framework cho backend và React + Vite cho frontend.
 
 ## Yêu cầu hệ thống

@@ -18,6 +18,16 @@ export const login = createAsyncThunk(
   }
 );
 
+export const register = createAsyncThunk(
+  'auth/register',
+  async (userData) => {
+    const response = await axios.post('/auth/register/', userData);
+    console.log(response.data);
+    localStorage.setItem('token', response.data.tokens.access);
+    return response.data.user;
+  }
+);
+
 const authSlice = createSlice({
   name: 'auth',
   initialState,

@@ -20,7 +20,7 @@ export const addItemToCart = createAsyncThunk(
   async ({ book }, { rejectWithValue }) => {
     try {
       const response = await endpoints.cart.addItem({ 
-        book_id: book.id, 
+        book_id: book._id, 
         quantity: 1 
       });
       return response.data;
