@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "cart.apps.CartConfig",
     "order.apps.OrderConfig",
     "shipping.apps.ShippingConfig",
+    "payment.apps.PaymentConfig",
     "authentication"
 ]
 
