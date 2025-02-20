@@ -102,22 +102,22 @@ DATABASES = {
     },
     'mongodb': {
         'ENGINE': 'djongo',
-        'NAME': 'bookstore',
-        'ENFORCE_SCHEMA': False,  # Set to False for more flexibility
+        'NAME': config('MONGODB_DATABASE'),
+        'ENFORCE_SCHEMA': False,
         'CLIENT': {
-            'host': 'mongodb://localhost:27017/',
-            'username': '',  # Nếu không có authentication thì để trống
-            'password': '',  # Nếu không có authentication thì để trống
-            'authSource': 'admin',  # Default authentication database
+            'host': f'mongodb://{config("MONGODB_HOST")}:{config("MONGODB_PORT")}/',
+            'username': config('MONGODB_USERNAME', default=''),
+            'password': config('MONGODB_PASSWORD', default=''),
+            'authSource': 'admin',
         },
     },
-    'customers': {
-        'ENGINE': 'django.db.backends.mysql',  # Đổi thành mysql
-        'NAME': 'bookstore_customers',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': 'localhost',
-        'PORT': '3306',
+    'mysql': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': config('MYSQL_DATABASE'),
+        'USER': config('MYSQL_USER'),
+        'PASSWORD': config('MYSQL_PASSWORD', default=''),
+        'HOST': config('MYSQL_HOST'),
+        'PORT': config('MYSQL_PORT'),
         'OPTIONS': {
             'charset': 'utf8mb4',
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",

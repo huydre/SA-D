@@ -1,4 +1,3 @@
-# serializers.py
 from rest_framework import serializers
 from .models import Book
 from bson import ObjectId
@@ -10,7 +9,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 class BookSerializer(serializers.ModelSerializer):
-    publication_date = serializers.DateField()
+    publication_date = serializers.DateField(format='%Y-%m-%d')
     image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
@@ -40,6 +39,20 @@ class BookSerializer(serializers.ModelSerializer):
             database = client['bookstore']
             collection = database['books']
 
+            # Convert publication_date to string
+            pub_date = validated_data.get('publication_date')
+            pub_date_str = None
+            if pub_date:
+                if isinstance(pub_date, (date, datetime)):
+                    pub_date_str = pub_date.strftime('%Y-%m-%d')
+                elif isinstance(pub_date, str):
+                    # Validate date string format
+                    try:
+                        datetime.strptime(pub_date, '%Y-%m-%d')
+                        pub_date_str = pub_date
+                    except ValueError:
+                        raise serializers.ValidationError("Invalid date format. Use YYYY-MM-DD")
+
             # Prepare book data
             book_data = {
                 'title': validated_data.get('title'),
@@ -49,20 +62,11 @@ class BookSerializer(serializers.ModelSerializer):
                 'stock': int(validated_data.get('stock', 0)),
                 'isbn': validated_data.get('isbn'),
                 'publisher': validated_data.get('publisher'),
+                'publication_date': pub_date_str,
                 'image': image_path,
                 'created_at': datetime.now(),
                 'updated_at': datetime.now()
             }
-
-            # Handle publication date - store as date object
-            pub_date = validated_data.get('publication_date')
-            if pub_date:
-                if isinstance(pub_date, str):
-                    book_data['publication_date'] = datetime.strptime(pub_date, '%Y-%m-%d').date()
-                elif isinstance(pub_date, date):
-                    book_data['publication_date'] = pub_date
-                elif isinstance(pub_date, datetime):
-                    book_data['publication_date'] = pub_date.date()
 
             logger.info(f"Attempting to insert book data: {book_data}")
 
@@ -72,20 +76,24 @@ class BookSerializer(serializers.ModelSerializer):
                     default_storage.delete(image_path)
                 raise serializers.ValidationError("Failed to insert book into database")
 
+            # Retrieve the created book
             created_book = collection.find_one({'_id': result.inserted_id})
             if not created_book:
                 if image_path:
                     default_storage.delete(image_path)
                 raise serializers.ValidationError("Could not retrieve created book")
 
+            # Convert MongoDB document to Book instance
             book = Book()
             created_book['_id'] = str(created_book['_id'])
 
             for key, value in created_book.items():
                 if hasattr(book, key):
                     if key == 'publication_date' and value:
-                        if isinstance(value, datetime):
-                            value = value.date()
+                        try:
+                            value = datetime.strptime(value, '%Y-%m-%d').date()
+                        except (ValueError, TypeError):
+                            value = None
                     setattr(book, key, value)
 
             return book
@@ -96,27 +104,36 @@ class BookSerializer(serializers.ModelSerializer):
             logger.error(f"Error creating book: {str(e)}", exc_info=True)
             raise serializers.ValidationError(f"Error creating book: {str(e)}")
 
-
     def to_representation(self, instance):
         data = super().to_representation(instance)
+
+        # Convert ObjectId to string
         if '_id' in data and data['_id']:
             data['_id'] = str(data['_id'])
-        
-        for field in ['publication_date', 'created_at', 'updated_at']:
-            if field in data and data[field]:
-                if isinstance(data[field], (datetime, date)):
-                    data[field] = data[field].isoformat()
-                
+
+        # Convert dates to ISO format
+        if 'publication_date' in data and data['publication_date']:
+            if isinstance(data['publication_date'], (date, datetime)):
+                data['publication_date'] = data['publication_date'].strftime('%Y-%m-%d')
+            elif isinstance(data['publication_date'], str):
+                try:
+                    date_obj = datetime.strptime(data['publication_date'], '%Y-%m-%d')
+                    data['publication_date'] = date_obj.strftime('%Y-%m-%d')
+                except ValueError:
+                    data['publication_date'] = None
+
         return data
 
     def validate(self, data):
         logger.info(f"Validating data: {data}")
-        
+
+        # Validate required fields
         required_fields = ['title', 'author', 'price', 'stock', 'isbn']
         for field in required_fields:
             if field not in data:
                 raise serializers.ValidationError(f"{field} is required")
 
+        # Validate price
         if 'price' in data:
             try:
                 price = float(data['price'])
@@ -126,6 +143,7 @@ class BookSerializer(serializers.ModelSerializer):
             except (TypeError, ValueError):
                 raise serializers.ValidationError("Invalid price format")
 
+        # Validate stock
         if 'stock' in data:
             try:
                 stock = int(data['stock'])
@@ -135,8 +153,14 @@ class BookSerializer(serializers.ModelSerializer):
             except (TypeError, ValueError):
                 raise serializers.ValidationError("Invalid stock format")
 
+        # Validate publication date
         if 'publication_date' in data and data['publication_date']:
-            if not isinstance(data['publication_date'], (date, str)):
-                raise serializers.ValidationError("Invalid publication date format")
+            if isinstance(data['publication_date'], str):
+                try:
+                    datetime.strptime(data['publication_date'], '%Y-%m-%d')
+                except ValueError:
+                    raise serializers.ValidationError("Invalid publication date format. Use YYYY-MM-DD")
 
         return data
+    
+    

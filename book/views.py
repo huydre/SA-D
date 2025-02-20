@@ -6,6 +6,7 @@ from .serializers import BookSerializer
 import logging
 from django.core.files.storage import default_storage
 from datetime import datetime
+from pymongo import MongoClient
 
 logger = logging.getLogger(__name__)
 
@@ -15,28 +16,47 @@ class BookViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         try:
-            return Book.objects.all().using('mongodb')
+            # Kết nối trực tiếp với MongoDB
+            client = MongoClient('mongodb://localhost:27017/')
+            db = client['bookstore']
+            collection = db['books']
+
+            # Lấy tất cả documents
+            books_data = list(collection.find())
+            logger.info(f"Found {len(books_data)} books in MongoDB")
+
+            # Chuyển đổi MongoDB documents thành Book objects
+            books = []
+            for book_data in books_data:
+                book = Book()
+                for key, value in book_data.items():
+                    if hasattr(book, key):
+                        if key == '_id':
+                            value = str(value)
+                        setattr(book, key, value)
+                books.append(book)
+
+            return books
         except Exception as e:
             logger.error(f"Error getting queryset: {e}")
-            return Book.objects.none()
+            return []
 
     def list(self, request, *args, **kwargs):
         try:
-            queryset = self.get_queryset()
-            logger.info(f"Initial queryset count: {queryset.count()}")
+            books = self.get_queryset()
+            logger.info(f"Retrieved {len(books)} books")
 
             books_data = []
-            for book in queryset:
+            for book in books:
                 try:
-                    logger.info(f"Serializing book: {book.title}")
                     serializer = self.get_serializer(book)
                     book_data = serializer.data
                     books_data.append(book_data)
                 except Exception as e:
-                    logger.error(f"Error serializing book {getattr(book, '_id', 'unknown')}: {e}")
+                    logger.error(f"Error serializing book {getattr(book, 'title', 'unknown')}: {e}")
                     continue
 
-            books_data = sorted(books_data, key=lambda x: x['title'])
+            books_data = sorted(books_data, key=lambda x: x.get('title', ''))
 
             logger.info(f"Successfully serialized {len(books_data)} books")
             return Response({

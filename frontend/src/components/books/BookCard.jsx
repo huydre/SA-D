@@ -15,7 +15,7 @@ const BookCard = ({ book }) => {
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden">
       <img 
-        src={book.image_url || '/default-book.jpg'} 
+        src={book.image || '/default-book.jpg'} 
         alt={book.title}
         className="w-full h-48 object-cover"
       />
