@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     'django_filters',
     "customer.apps.CustomerConfig",
     "cart.apps.CartConfig",
+    "order.apps.OrderConfig",
     "authentication"
 ]
 
@@ -89,6 +91,8 @@ WSGI_APPLICATION = "project1.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -96,7 +100,14 @@ DATABASES = {
     },
     'mongodb': {
         'ENGINE': 'djongo',
-        'NAME': 'bookstore_db',
+        'NAME': 'bookstore',
+        'ENFORCE_SCHEMA': False,  # Set to False for more flexibility
+        'CLIENT': {
+            'host': 'mongodb://localhost:27017/',
+            'username': '',  # Nếu không có authentication thì để trống
+            'password': '',  # Nếu không có authentication thì để trống
+            'authSource': 'admin',  # Default authentication database
+        },
     },
     'customers': {
         'ENGINE': 'django.db.backends.mysql',  # Đổi thành mysql
@@ -110,6 +121,14 @@ DATABASES = {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             'sql_mode': 'STRICT_TRANS_TABLES',
         },
+    },
+    'postgresql': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('POSTGREE_DATABASE'),
+        'USER': config('POSTGREE_USER'),
+        'PASSWORD': config('POSTGREE_PASSWORD'),
+        'HOST': config('POSTGREE_HOST'),
+        'PORT': config('POSTGREE_PORT'),
     }
 }
 

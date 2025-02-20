@@ -43,27 +43,41 @@ const AddBook = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
+  
     try {
       const formData = new FormData();
+      
+      // Add regular fields
       Object.keys(bookData).forEach(key => {
-        formData.append(key, bookData[key]);
+        if (key !== 'image') {
+          formData.append(key, bookData[key]);
+        }
       });
-
-      //nếu tạo thành công mới chuyển về admin
-      const createdBook = await dispatch(createBook(formData));
-      toast.success('Book added successfully');
-        if (createdBook) {
-            navigate('/admin');
-            }
-
-
+  
+      // Handle image file
+      const imageInput = document.querySelector('input[type="file"]');
+      if (imageInput && imageInput.files[0]) {
+        formData.append('image', imageInput.files[0]);
+      }
+      
+      // Log FormData contents
+      for (let pair of formData.entries()) {
+        console.log('FormData entry:', pair[0], pair[1]);
+      }
+  
+      const response = await dispatch(createBook(formData)).unwrap();
+      
+      if (response) {
+        toast.success('Book added successfully');
+        navigate('/admin');
+      }
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to add book');
+      toast.error(err.message || 'Failed to add book');
     } finally {
       setLoading(false);
     }
-  };
+};
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
@@ -190,7 +204,7 @@ const AddBook = () => {
               name="image"
               onChange={handleChange}
               accept="image/*"
-              className="mt-1 block w-full"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             />
           </div>
 

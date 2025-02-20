@@ -1,115 +1,152 @@
-from rest_framework import viewsets, filters, status, parsers
-from rest_framework.decorators import action
+from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
-from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.parsers import MultiPartParser, FormParser
 from .models import Book
 from .serializers import BookSerializer
+import logging
+from django.core.files.storage import default_storage
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 class BookViewSet(viewsets.ModelViewSet):
-    queryset = Book.objects.all()
     serializer_class = BookSerializer
-    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['author', 'price']
-    search_fields = ['title', 'author']
-    ordering_fields = ['price', 'created_at', 'title']
-    ordering = ['title']
+    parser_classes = (MultiPartParser, FormParser)
 
-    def get_permissions(self):
-        """
-        Instantiates and returns the list of permissions that this view requires.
-        """
-        # AllowAny
-        return [AllowAny()]
+    def get_queryset(self):
+        try:
+            return Book.objects.all().using('mongodb')
+        except Exception as e:
+            logger.error(f"Error getting queryset: {e}")
+            return Book.objects.none()
+
+    def list(self, request, *args, **kwargs):
+        try:
+            queryset = self.get_queryset()
+            logger.info(f"Initial queryset count: {queryset.count()}")
+
+            books_data = []
+            for book in queryset:
+                try:
+                    logger.info(f"Serializing book: {book.title}")
+                    serializer = self.get_serializer(book)
+                    book_data = serializer.data
+                    books_data.append(book_data)
+                except Exception as e:
+                    logger.error(f"Error serializing book {getattr(book, '_id', 'unknown')}: {e}")
+                    continue
+
+            books_data = sorted(books_data, key=lambda x: x['title'])
+
+            logger.info(f"Successfully serialized {len(books_data)} books")
+            return Response({
+                'count': len(books_data),
+                'results': books_data
+            })
+
+        except Exception as e:
+            logger.error(f"Error in list view: {e}", exc_info=True)
+            return Response(
+                {
+                    "error": "Failed to fetch books",
+                    "detail": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def create(self, request, *args, **kwargs):
-        # Get the image file from request
-        image = request.FILES.get('image')
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # Save the instance
-        instance = serializer.save()
-
-        # Handle image upload if present
-        if image:
-            instance.image = image
-            instance.save()
-
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
-    def update(self, request, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-
-        # Get the image file from request
-        image = request.FILES.get('image')
-
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
-
-        # Save the instance
-        instance = serializer.save()
-
-        # Handle image upload if present
-        if image:
-            # Delete old image if it exists
-            if instance.image:
-                instance.image.delete(save=False)
-            instance.image = image
-            instance.save()
-
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['post'])
-    def update_stock(self, request, pk=None):
-        book = self.get_object()
-        stock = request.data.get('stock', None)
-
-        if stock is None:
-            return Response(
-                {'error': 'Stock value is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
         try:
-            stock = int(stock)
-            if stock < 0:
-                raise ValueError("Stock cannot be negative")
+            logger.info(f"Received data: {request.data}")
+            logger.info(f"Received files: {request.FILES}")
 
-            book.stock = stock
-            book.save()
+            # Validate required fields
+            required_fields = ['title', 'author', 'price', 'stock', 'isbn']
+            for field in required_fields:
+                if field not in request.data:
+                    return Response(
+                        {'error': f'{field} is required'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
 
-            serializer = self.get_serializer(book)
-            return Response(serializer.data)
+            # Create serializer with data
+            serializer = self.get_serializer(data=request.data)
 
-        except ValueError as e:
+            if not serializer.is_valid():
+                logger.error(f"Serializer errors: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                book = serializer.save()
+                return Response(
+                    self.get_serializer(book).data,
+                    status=status.HTTP_201_CREATED
+                )
+            except Exception as save_error:
+                logger.error(f"Error saving book: {save_error}")
+                return Response(
+                    {'error': str(save_error)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+        except Exception as e:
+            logger.error(f"Error in create view: {e}", exc_info=True)
             return Response(
                 {'error': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def update(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            old_image = instance.image if instance.image else None
+
+            data = request.data.copy()
+            
+            # Handle image upload for updates
+            if 'image' in request.FILES:
+                image_file = request.FILES['image']
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                filename = f"books/{timestamp}_{image_file.name}"
+                file_path = default_storage.save(filename, image_file)
+                data['image'] = file_path
+
+            serializer = self.get_serializer(instance, data=data, partial=True)
+            if not serializer.is_valid():
+                # If new image was saved but validation failed, delete it
+                if 'image' in data and default_storage.exists(data['image']):
+                    default_storage.delete(data['image'])
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            # Save the updated instance
+            book = serializer.save()
+
+            # Delete old image if it was replaced
+            if old_image and 'image' in data and old_image != data['image']:
+                if default_storage.exists(old_image):
+                    default_storage.delete(old_image)
+
+            return Response(serializer.data)
+        except Exception as e:
+            logger.error(f"Error updating book: {e}")
+            # Clean up new image if it was saved
+            if 'data' in locals() and 'image' in data and default_storage.exists(data['image']):
+                default_storage.delete(data['image'])
+            return Response(
+                {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-    @action(detail=False, methods=['get'])
-    def in_stock(self, request):
-        books = Book.objects.filter(stock__gt=0)
-        serializer = self.get_serializer(books, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=['get'])
-    def out_of_stock(self, request):
-        books = Book.objects.filter(stock=0)
-        serializer = self.get_serializer(books, many=True)
-        return Response(serializer.data)
-    
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context['request'] = self.request
-        return context
-    
     def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            instance = self.get_object()
+            # Delete associated image if it exists
+            if instance.image and default_storage.exists(instance.image):
+                default_storage.delete(instance.image)
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            logger.error(f"Error deleting book: {e}")
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )

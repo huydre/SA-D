@@ -9,6 +9,7 @@ Dự án website bán sách sử dụng Django REST Framework cho backend và Re
 - MySQL 8.0+
 - MongoDB 6.0+
 - XAMPP (cho MySQL)
+- Postgree SQL
 
 ## Cấu trúc Database
 - MongoDB: Quản lý Books
@@ -21,17 +22,8 @@ Dự án website bán sách sử dụng Django REST Framework cho backend và Re
 
 ```bash
 # Clone dự án
-git clone [repository-url]
-cd [project-name]
-
-# Tạo môi trường ảo
-python -m venv venv
-
-# Kích hoạt môi trường ảo
-# Windows
-venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
+git https://github.com/huydre/SA-D
+cd SA-D
 
 # Cài đặt các dependencies
 pip install -r requirements.txt
