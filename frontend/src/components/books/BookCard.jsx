@@ -1,19 +1,24 @@
 import { useDispatch } from 'react-redux';
 import { addItemToCart } from '../../features/cart/cartSlice';
 import { toast } from 'react-toastify'; // If you want to add notifications
+import { useNavigate } from 'react-router-dom';
 
 const BookCard = ({ book }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
-  const handleAddToCart = () => {
+  const handleAddToCart = (e) => {
+    e.stopPropagation(); 
     console.log('Adding to cart:', book);
-    dispatch(addItemToCart({ book }));
-    // Optional: Add a notification
-    toast.success('Book added to cart!');
+    dispatch(addItemToCart({ book, quantity: 1 }));
+    toast.success('Added to cart');
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden">
+    <div onClick={
+        () => navigate(`/books/${book._id}`) // Redirect to the book details page
+    }
+      className="bg-white rounded-lg shadow-md overflow-hidden">
       <img 
         src={book.image || '/default-book.jpg'} 
         alt={book.title}

@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { endpoints } from '../../services/api';
 
+
 // Fetch cart for current user
 export const fetchCart = createAsyncThunk(
   'cart/fetchCart',
@@ -17,11 +18,11 @@ export const fetchCart = createAsyncThunk(
 // Add item to cart
 export const addItemToCart = createAsyncThunk(
   'cart/addItem',
-  async ({ book }, { rejectWithValue }) => {
+  async ({ book, quantity }, { rejectWithValue }) => {
     try {
       const response = await endpoints.cart.addItem({ 
         book_id: book._id, 
-        quantity: 1 
+        quantity: quantity
       });
       return response.data;
     } catch (error) {
@@ -58,20 +59,15 @@ export const removeCartItem = createAsyncThunk(
 
 const initialState = {
   items: [],
+  totalItems: 0,
   loading: false,
-  error: null,
+  error: null
 };
 
 const cartSlice = createSlice({
   name: 'cart',
   initialState,
-  reducers: {
-    resetCart: (state) => {
-      state.items = [];
-      state.loading = false;
-      state.error = null;
-    },
-  },
+  reducers: {},
   extraReducers: (builder) => {
     builder
       // Fetch cart
@@ -81,7 +77,19 @@ const cartSlice = createSlice({
       })
       .addCase(fetchCart.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = action.payload.items || [];
+        // Ensure we don't have duplicates when setting items
+  const uniqueItems = [];
+  const seenIds = new Set();
+  
+  action.payload.items.forEach(item => {
+    if (!seenIds.has(item.book._id)) {
+      uniqueItems.push(item);
+      seenIds.add(item.book._id);
+    }
+  });
+  
+  state.items = uniqueItems;
+  state.totalItems = uniqueItems.length;
       })
       .addCase(fetchCart.rejected, (state, action) => {
         state.loading = false;
@@ -94,7 +102,21 @@ const cartSlice = createSlice({
       })
       .addCase(addItemToCart.fulfilled, (state, action) => {
         state.loading = false;
-        state.items.push(action.payload);
+        // Instead of pushing, we should update existing item or add new one
+        const existingItemIndex = state.items.findIndex(
+          item => item.book._id === action.payload.book._id
+        );
+        
+        if (existingItemIndex !== -1) {
+          // Update existing item
+          state.items[existingItemIndex] = action.payload;
+        } else {
+          // Add new item
+          state.items.push(action.payload);
+        }
+        
+        // Update total items count
+        state.totalItems = state.items.length;
       })
       .addCase(addItemToCart.rejected, (state, action) => {
         state.loading = false;
@@ -118,9 +140,17 @@ const cartSlice = createSlice({
 export const { resetCart } = cartSlice.actions;
 
 export const selectCartItems = state => state.cart?.items || [];
-export const selectCartTotal = state => 
-  (state.cart?.items || []).reduce((total, item) => total + (item.book.price * item.quantity), 0);
-export const selectCartItemsCount = state =>
-  (state.cart?.items || []).reduce((count, item) => count + item.quantity, 0);
+export const selectCartTotal = state => {
+  const uniqueItems = new Map();
+  
+  // Use only the latest entry for each book
+  state.cart?.items.forEach(item => {
+    uniqueItems.set(item.book._id, item);
+  });
+  
+  return Array.from(uniqueItems.values())
+    .reduce((total, item) => total + (parseFloat(item.book.price) * item.quantity), 0);
+};
+export const selectCartItemsCount = (state) => state.cart.totalItems;
 
 export default cartSlice.reducer;

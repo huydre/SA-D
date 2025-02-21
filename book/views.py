@@ -73,6 +73,53 @@ class BookViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+        
+    def retrieve(self, request, pk=None):
+        try:
+            # Kết nối MongoDB
+            client = MongoClient('mongodb://localhost:27017/')
+            db = client['bookstore']
+            collection = db['books']
+
+            # Tìm book theo id
+            from bson import ObjectId
+            try:
+                book_id = ObjectId(pk)
+            except:
+                return Response(
+                    {'error': 'Invalid book ID format'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            book_data = collection.find_one({'_id': book_id})
+
+            if not book_data:
+                return Response(
+                    {'error': 'Book not found'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Chuyển đổi MongoDB document thành Book object
+            book = Book()
+            for key, value in book_data.items():
+                if hasattr(book, key):
+                    if key == '_id':
+                        value = str(value)
+                    setattr(book, key, value)
+
+            # Serialize và trả về response
+            serializer = self.get_serializer(book)
+            return Response(serializer.data)
+
+        except Exception as e:
+            logger.error(f"Error retrieving book: {e}", exc_info=True)
+            return Response(
+                {
+                    "error": "Failed to retrieve book",
+                    "detail": str(e)
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     def create(self, request, *args, **kwargs):
         try:

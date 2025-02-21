@@ -12,6 +12,7 @@ import Book from './pages/Book';
 import Cart from './pages/Cart';  
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AddBook from './pages/admin/AddBook';
+import { BookDetails } from './pages/BookDetails';
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/books" element={<Book />} />
+              <Route path="books/:id" element={<BookDetails />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/books/add" element={<AddBook />} />
             </Routes>

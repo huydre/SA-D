@@ -87,7 +87,7 @@ const Cart = () => {
               className="flex items-center border-b border-gray-200 py-4"
             >
               <img 
-                src={item.book.cover_image || "https://placehold.co/96x128"} 
+                src={"http://localhost:8000/media/" + item.book.image || "https://placehold.co/96x128"} 
                 alt={item.book.title}
                 className="w-24 h-32 object-cover"
               />

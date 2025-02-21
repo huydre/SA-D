@@ -16,7 +16,11 @@ class CartViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Cart.objects.filter(customer__user=self.request.user)
+        try:
+            customer = Customer.objects.using('mysql').get(user_id=self.request.user.id)
+            return Cart.objects.filter(customer_id=customer.id)
+        except Customer.DoesNotExist:
+            return Cart.objects.none()
 
     def get_or_create_cart(self):
         try:
@@ -62,8 +66,11 @@ class CartViewSet(viewsets.ModelViewSet):
             raise ValidationError(f"Error creating cart: {str(e)}")
 
     def list(self, request):
-        # Get or create cart for current user
         cart = self.get_or_create_cart()
+
+        # Prefetch related items
+        cart = Cart.objects.prefetch_related('items').get(id=cart.id)
+
         serializer = self.get_serializer(cart)
         return Response(serializer.data)
 
